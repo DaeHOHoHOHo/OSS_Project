@@ -122,6 +122,47 @@ artifact_functions = {
 }
 
 
+# 아티팩트 별 검색 기능
+def search_in_treeview(tree, query, header_name, header_map, search_results):
+    search_results.clear()
+
+    if header_name == '전체':
+        search_columns = range(len(tree['columns']))
+    else:
+        search_columns = [header_map[header_name]]
+
+    for item in tree.get_children():
+        if any(query.lower() in str(tree.item(item, 'values')[col]).lower() for col in search_columns):
+            tree.item(item, tags=('found',))
+            search_results.append(item)
+        else:
+            tree.item(item, tags=('not_found',))
+
+
+
+def navigate_search_results(tree, search_results, direction):
+    if not search_results:
+        return
+
+    current_item = tree.focus()
+    next_item = None
+
+    if direction == "up":
+        previous_items = [item for item in search_results if tree.index(item) < tree.index(current_item)]
+        if previous_items:
+            next_item = previous_items[-1]
+
+    elif direction == "down":
+        next_items = [item for item in search_results if tree.index(item) > tree.index(current_item)]
+        if next_items:
+            next_item = next_items[0]
+
+    if next_item:
+        tree.selection_set(next_item)
+        tree.focus(next_item)
+        tree.see(next_item)  
+
+
 
 
 
@@ -145,27 +186,51 @@ def create_result_frame(parent, title, items):
     if not isinstance(items, list):
         items = [items]
 
-    # 리스트의 리스트인 경우 Treeview 사용
     if len(items) > 0 and all(isinstance(item, list) for item in items):
+        search_results = []
+        header_map = {name: index for index, name in enumerate(items[0])}
+        search_frame = tk.Frame(frame)
+        search_frame.pack(side='top', fill='x', padx=5, pady=5)
+
+        header_options = ['전체'] + items[0]
+        header_combobox = ttk.Combobox(search_frame, values=header_options, state="readonly")
+        header_combobox.current(0)
+        header_combobox.pack(side='left', padx=5, pady=5)
+
+        # 검색창 및 검색 버튼
+        search_entry = tk.Entry(search_frame)
+        search_entry.pack(side='left', padx=5, pady=5)
+        search_button = tk.Button(search_frame, text="검색", command=lambda: search_in_treeview(tree, search_entry.get(), header_combobox.get(), header_map))
+        search_button.pack(side='left', padx=5, pady=5)
+
+        up_button = tk.Button(search_frame, text="위", command=lambda: navigate_search_results(tree, search_results, "up"))
+        up_button.pack(side='left', padx=5, pady=5)
+
+        down_button = tk.Button(search_frame, text="아래", command=lambda: navigate_search_results(tree, search_results, "down"))
+        down_button.pack(side='left', padx=5, pady=5)
+
+        search_button.config(command=lambda: search_in_treeview(tree, search_entry.get(), header_combobox.get(), header_map, search_results))
+
+
         # Treeview 위젯 생성 및 설정
         tree = ttk.Treeview(items_frame, columns=[str(i) for i in range(len(items[0]))], show='headings')
         tree.pack(side='left', fill='both', expand=True)
 
-        # 컬럼 제목 및 너비 설정
         for i, title in enumerate(items[0]):
             tree.heading(str(i), text=title)
             tree.column(str(i), width=100, minwidth=50, anchor=tk.W)
 
-        # 데이터 삽입
         for row in items[1:]:
             tree.insert('', 'end', values=row)
 
-        # 스크롤바 추가
         scrollbar = ttk.Scrollbar(items_frame, orient='vertical', command=tree.yview)
         scrollbar.pack(side='right', fill='y')
         tree.configure(yscrollcommand=scrollbar.set)
+
+        tree.tag_configure('found', background='yellow')
+        tree.tag_configure('not_found', background='white')
+
     else:
-        # 단일 항목 처리
         for item in items:
             item_label = tk.Label(items_frame, text=item, background='white')
             item_label.pack(side='top', anchor='w', padx=5, pady=2)
@@ -174,9 +239,6 @@ def create_result_frame(parent, title, items):
     title_label.bind("<Button-1>", lambda e: toggle_items(items_frame))
 
     return frame
-
-
-
 
 
 
