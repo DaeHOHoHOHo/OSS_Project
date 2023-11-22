@@ -142,37 +142,39 @@ def create_result_frame(parent, title, items):
     items_frame = tk.Frame(frame, background='white')
     items_frame.pack(side='top', fill='x', padx=5, pady=5)
 
-    items_frame.bind("<Configure>", lambda e: e.widget.config(width=e.widget.winfo_width()))
+    if not isinstance(items, list):
+        items = [items]
 
+    # 리스트의 리스트인 경우 Treeview 사용
+    if len(items) > 0 and all(isinstance(item, list) for item in items):
+        # Treeview 위젯 생성 및 설정
+        tree = ttk.Treeview(items_frame, columns=[str(i) for i in range(len(items[0]))], show='headings')
+        tree.pack(side='left', fill='both', expand=True)
 
-    if isinstance(items, list):
-        if len(items) > 0 and all(isinstance(item, list) for item in items):
-            column_titles = items[0]
-            data_rows = items[1:]
+        # 컬럼 제목 및 너비 설정
+        for i, title in enumerate(items[0]):
+            tree.heading(str(i), text=title)
+            tree.column(str(i), width=100, minwidth=50, anchor=tk.W)
 
-            tree = ttk.Treeview(items_frame, columns=[str(i) for i in range(len(column_titles))], show='headings')
-            tree.pack(expand=True, fill='x')
+        # 데이터 삽입
+        for row in items[1:]:
+            tree.insert('', 'end', values=row)
 
-            for i, title in enumerate(column_titles):
-                tree.heading(str(i), text=title)
-
-            for col in tree['columns']:
-                tree.column(col, width=100, minwidth=50, anchor=tk.W)
-
-            for row in data_rows:
-                tree.insert('', 'end', values=row)
-        else:
-            for item in items:
-                item_label = tk.Label(items_frame, text=item, background='white')
-                item_label.pack(side='top', anchor='w', padx=5, pady=2)
+        # 스크롤바 추가
+        scrollbar = ttk.Scrollbar(items_frame, orient='vertical', command=tree.yview)
+        scrollbar.pack(side='right', fill='y')
+        tree.configure(yscrollcommand=scrollbar.set)
     else:
-        item_label = tk.Label(items_frame, text=str(items), background='white')
-        item_label.pack(side='top', anchor='w', padx=5, pady=2)
+        # 단일 항목 처리
+        for item in items:
+            item_label = tk.Label(items_frame, text=item, background='white')
+            item_label.pack(side='top', anchor='w', padx=5, pady=2)
 
     title_frame.bind("<Button-1>", lambda e: toggle_items(items_frame))
     title_label.bind("<Button-1>", lambda e: toggle_items(items_frame))
 
     return frame
+
 
 
 
