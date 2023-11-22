@@ -1,17 +1,28 @@
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox, scrolledtext
+import csv
+import os
 
 global canvas
 
 # == 아티팩트 함수 ==========================================================================================================================
 def memory_dump_func():
-    return ["항목1", "항목2", "항목3"]
+    file_name = 'memory_dump.csv'
+
+    with open(file_name, 'r') as file:
+        reader = csv.reader(file)
+        return list(reader)
 
 def prefetch_func():
-    return ["1", "2"]
+    file_name = 'prefetch.csv'
+
+    with open(file_name, 'r') as file:
+        reader = csv.reader(file)
+        return list(reader)
 
 def NTFS_func():
-    return []
+    return ["항목1", "항목2", "항목3"]
+
 
 def sys_info_func():
     return []
@@ -114,25 +125,70 @@ artifact_functions = {
 
 
 
-# 결과 프레임 설정
+# 결과 리스트 토글 기능
+def toggle_items(frame):
+    frame.pack_forget() if frame.winfo_viewable() else frame.pack(side='top', fill='x', padx=5, pady=5)
+
+# 결과 프레임 출력
 def create_result_frame(parent, title, items):
     frame = tk.Frame(parent, relief='solid', borderwidth=2, background='white')
-    title_label = tk.Label(frame, text=title, font=('Arial', 10), background='#D6D5CB', anchor='w')
-    title_label.pack(side='top', fill='x', padx=5, pady=5)
-    
-    if not isinstance(items, list):
-        items = [items]
-    for item in items:
-        item_label = tk.Label(frame, text=item, background='white')
+    frame.pack(side='top', fill='x', padx=5, pady=5)
+
+    title_frame = tk.Frame(frame, background='#D6D5CB')
+    title_frame.pack(side='top', fill='x')
+    title_label = tk.Label(title_frame, text=title, font=('Arial', 10), background='#D6D5CB', anchor='w')
+    title_label.pack(side='left', padx=5, pady=5)
+
+    items_frame = tk.Frame(frame, background='white')
+    items_frame.pack(side='top', fill='x', padx=5, pady=5)
+
+    items_frame.bind("<Configure>", lambda e: e.widget.config(width=e.widget.winfo_width()))
+
+
+    if isinstance(items, list):
+        if len(items) > 0 and all(isinstance(item, list) for item in items):
+            column_titles = items[0]
+            data_rows = items[1:]
+
+            tree = ttk.Treeview(items_frame, columns=[str(i) for i in range(len(column_titles))], show='headings')
+            tree.pack(expand=True, fill='x')
+
+            for i, title in enumerate(column_titles):
+                tree.heading(str(i), text=title)
+
+            for col in tree['columns']:
+                tree.column(col, width=100, minwidth=50, anchor=tk.W)
+
+            for row in data_rows:
+                tree.insert('', 'end', values=row)
+        else:
+            for item in items:
+                item_label = tk.Label(items_frame, text=item, background='white')
+                item_label.pack(side='top', anchor='w', padx=5, pady=2)
+    else:
+        item_label = tk.Label(items_frame, text=str(items), background='white')
         item_label.pack(side='top', anchor='w', padx=5, pady=2)
-    
+
+    title_frame.bind("<Button-1>", lambda e: toggle_items(items_frame))
+    title_label.bind("<Button-1>", lambda e: toggle_items(items_frame))
+
     return frame
+
+
+
+
+
+
+
 
 
 # 결과 창 스크롤 마우스 휠 연동
 def on_mousewheel(event):
     global canvas
     canvas.yview_scroll(int(-1*(event.delta/120)), "units")
+
+
+
 
 
 
@@ -167,7 +223,7 @@ def start_capture():
     result_container.bind("<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
 
 
-    case_ref_label = tk.Label(result_container, text="케이스 참조: {}".format(case_ref), font=('Arial', 12), background='white', anchor='w')
+    case_ref_label = tk.Label(result_container, text="케이스 참조: {}".format(case_ref), font=('Arial', 12), background='white', anchor='w', width=85)
     case_ref_label.pack(side='top', fill='x', padx=5, pady=5)
 
     # 체크된 아티팩트에 대응하는 함수 호출
