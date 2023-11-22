@@ -253,11 +253,26 @@ def on_mousewheel(event):
 
 
 
+def move_to_frame():
+    selected_artifact = selected_combobox.get()
+    if selected_artifact in artifact_frames:
+        y_position = artifact_frames[selected_artifact]
+        
+        # 캔버스 스크롤 영역의 높이를 가져옴
+        scrollregion = canvas.cget("scrollregion").split()
+        if scrollregion:
+            scrollregion_height = int(scrollregion[3])
+
+            # 프레임의 상대적 위치 계산
+            relative_position = y_position / scrollregion_height
+
+            # 캔버스 스크롤
+            canvas.yview_moveto(relative_position)
 
 
 
 def start_capture():
-    global case_ref_label, case_ref_entry, options_frame, output_label, output_entry, browse_button, start_button, artifact_label, canvas
+    global case_ref_label, case_ref_entry, options_frame, output_label, output_entry, browse_button, start_button, artifact_label, canvas, fixed_frame, selected_combobox, artifact_frames
     # 기존 위젯 숨기기
     case_label.grid_forget()
     case_ref_entry.grid_forget()
@@ -272,12 +287,26 @@ def start_capture():
 
     case_ref = case_ref_entry.get()
 
+    # 고정 콤보박스를 위한 새 프레임 생성
+    fixed_frame = tk.Frame(app, background='#f0f0f0')
+    fixed_frame.grid(row=0, column=0, columnspan=3, sticky='ew')
+
+    move_button = ttk.Button(fixed_frame, text="이동", command=move_to_frame)
+    move_button.grid(row=0, column=1, padx=5, pady=5)
+
+    # 선택된 체크박스 목록 생성
+    selected_options = [option for option in options if variables[option].get()]
+    
+    # 콤보박스 생성 및 설정
+    selected_combobox = ttk.Combobox(fixed_frame, values=selected_options, state="readonly")
+    selected_combobox.grid(row=0, column=0, padx=5, pady=5)
+
     # 스크롤 가능한 프레임
     canvas = tk.Canvas(app, borderwidth=0, background="#ffffff", height=600, width=780)
     scrollbar = tk.Scrollbar(app, orient="vertical", command=canvas.yview)
     canvas.configure(yscrollcommand=scrollbar.set)
-    scrollbar.grid(row=0, column=1, sticky='ns')
-    canvas.grid(row=0, column=0, sticky="nsew")
+    scrollbar.grid(row=3, column=1, sticky='ns')
+    canvas.grid(row=2, column=0, sticky="nsew")
     canvas.bind_all("<MouseWheel>", on_mousewheel)
 
 
@@ -290,7 +319,9 @@ def start_capture():
     case_ref_label = tk.Label(result_container, text="케이스 참조: {}".format(case_ref), font=('Arial', 12), background='white', anchor='w', width=85)
     case_ref_label.pack(side='top', fill='x', padx=5, pady=5)
 
-    # 체크된 아티팩트에 대응하는 함수 호출
+
+    artifact_frames = {}
+    y_position = 0
     for option in options:
         if variables[option].get() and option in artifact_functions:
             function = artifact_functions[option]
@@ -298,6 +329,13 @@ def start_capture():
             frame = create_result_frame(result_container, option, result_items)
             frame.pack(side='top', fill='x', padx=5, pady=5)
 
+            # Tkinter 윈도우 갱신
+            app.update_idletasks()
+
+            # 프레임의 실제 높이 계산
+            frame_height = frame.winfo_height()
+            artifact_frames[option] = y_position
+            y_position += frame_height
 
 
 
