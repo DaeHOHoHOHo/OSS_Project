@@ -1,5 +1,7 @@
 import tkinter as tk
-from tkinter import ttk, filedialog, messagebox
+from tkinter import ttk, filedialog, messagebox, scrolledtext
+
+global canvas
 
 # == 아티팩트 함수 ==========================================================================================================================
 def memory_dump_func():
@@ -110,6 +112,9 @@ artifact_functions = {
 
 
 
+
+
+# 결과 프레임 설정
 def create_result_frame(parent, title, items):
     frame = tk.Frame(parent, relief='solid', borderwidth=2, background='white')
     title_label = tk.Label(frame, text=title, font=('Arial', 10), background='#D6D5CB', anchor='w')
@@ -123,9 +128,17 @@ def create_result_frame(parent, title, items):
     
     return frame
 
+
+# 결과 창 스크롤 마우스 휠 연동
+def on_mousewheel(event):
+    global canvas
+    canvas.yview_scroll(int(-1*(event.delta/120)), "units")
+
+
+
 def start_capture():
+    global case_ref_label, case_ref_entry, options_frame, output_label, output_entry, browse_button, start_button, artifact_label, canvas
     # 기존 위젯 숨기기
-    global case_ref_label, case_ref_entry, options_frame, output_label, output_entry, browse_button, start_button, artifact_label
     case_label.grid_forget()
     case_ref_entry.grid_forget()
     options_frame.grid_forget()
@@ -135,9 +148,24 @@ def start_capture():
     start_button.grid_forget()
     artifact_label.grid_forget()
 
+
+
     case_ref = case_ref_entry.get()
-    result_container = tk.Frame(app, background='white')
-    result_container.grid(row=1002, column=0, columnspan=3, padx=5, pady=20, sticky='ew')
+
+    # 스크롤 가능한 프레임
+    canvas = tk.Canvas(app, borderwidth=0, background="#ffffff", height=600, width=780)
+    scrollbar = tk.Scrollbar(app, orient="vertical", command=canvas.yview)
+    canvas.configure(yscrollcommand=scrollbar.set)
+    scrollbar.grid(row=0, column=1, sticky='ns')
+    canvas.grid(row=0, column=0, sticky="nsew")
+    canvas.bind_all("<MouseWheel>", on_mousewheel)
+
+
+    # 캔버스 안에 결과 프레임 배치
+    result_container = tk.Frame(canvas, background='white')
+    canvas.create_window((0, 0), window=result_container, anchor="nw")
+    result_container.bind("<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
+
 
     case_ref_label = tk.Label(result_container, text="케이스 참조: {}".format(case_ref), font=('Arial', 12), background='white', anchor='w')
     case_ref_label.pack(side='top', fill='x', padx=5, pady=5)
@@ -151,6 +179,11 @@ def start_capture():
             frame.pack(side='top', fill='x', padx=5, pady=5)
 
 
+
+
+
+
+# == 시작 페이지 ==================================================================================================================================
 
 
 # 파일 위치 찾아보기 함수
@@ -248,5 +281,8 @@ start_button.grid(row=1001, column=0, columnspan=3, padx=5, pady=20)
 result_label = tk.Label(app, justify=tk.LEFT, anchor='w')
 result_label.grid(row=1002, column=0, columnspan=3, padx=5, pady=20)
 
+
+app.grid_rowconfigure(1, weight=1)
 app.grid_columnconfigure(1, weight=1)
 app.mainloop()
+
