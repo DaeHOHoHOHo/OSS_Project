@@ -198,6 +198,7 @@ def browse_output_directory():
 app = tk.Tk()
 app.title('데이터 수집 도구')
 app.geometry("800x600")
+app.resizable(False, False)
 app['bg'] = '#f0f0f0'
 style = ttk.Style()
 style.theme_use('clam')
@@ -217,6 +218,11 @@ artifact_label.grid(row=1, column=0, columnspan=1, padx=5, pady=(50, 1))
 options_frame = ttk.Frame(app, relief='solid', borderwidth=2)
 options_frame.grid(row=2, column=0, columnspan=3, padx=10, pady=1, sticky='ew')
 
+
+# 모두 선택 함수
+def select_all():
+    for option in options:
+        variables[option].set(select_all_var.get())
 
 # 각 체크박스와 변수 초기화
 checkbuttons = {}
@@ -258,7 +264,10 @@ for i, option in enumerate(options):
 for i in range(5):
     options_frame.grid_columnconfigure(i, weight=1)
 
-
+# 모두 선택 기능
+select_all_var = tk.BooleanVar()
+select_all_checkbox = ttk.Checkbutton(options_frame, text="모두 선택", variable=select_all_var, command=select_all)
+select_all_checkbox.grid(row=100, column=4, padx=3, pady=2, sticky='e')
 
 
 
