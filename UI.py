@@ -214,6 +214,10 @@ def create_result_frame(parent, title, items):
         filter_button = tk.Button(search_frame, text="필터링", command=lambda: show_filter_window(items[0], tree))
         filter_button.pack(side='left', padx=5, pady=5)
 
+        # 초기화 버튼 추가
+        reset_button = tk.Button(search_frame, text="초기화", command=lambda: reset_treeview(tree))
+        reset_button.pack(side='left', padx=5, pady=5)
+
         search_button.config(command=lambda: search_in_treeview(tree, search_entry.get(), header_combobox.get(), header_map, search_results))
 
 
@@ -310,8 +314,8 @@ def add_filter_condition(filter_frame, headers, tree):
 
 
 def apply_filters(tree, headers, filter_window):
-    for item in tree.get_children():
-        tree.item(item, tags=('default',))
+    matching_items = []
+    non_matching_items = []
 
     for item in tree.get_children():
         item_values = tree.item(item, 'values')
@@ -333,19 +337,37 @@ def apply_filters(tree, headers, filter_window):
                         match = False
                         break
             except tkinter.TclError:
-                # 위젯이 더 이상 유효하지 않음
                 continue
 
-        if not match:
-            tree.item(item, tags=('not_found',))
+        if match:
+            matching_items.append((item, tree.item(item)))
         else:
-            tree.item(item, tags=('found',))
+            non_matching_items.append((item, tree.item(item)))
 
-    tree.tag_configure('found', background='white')
-    tree.tag_configure('not_found', background='lightgray')
-    tree.tag_configure('default', background='white')
+    # 트리 뷰에서 모든 항목 삭제
+    tree.delete(*tree.get_children())
+
+    # 필터 조건에 맞는 항목들을 먼저 삽입하고 태그 지정
+    for item, values in matching_items:
+        tree.insert('', 'end', iid=item, values=values['values'], tags=('matched',))
+
+    # 필터 조건에 맞지 않는 항목들을 그 다음에 삽입하고 태그 지정
+    for item, values in non_matching_items:
+        tree.insert('', 'end', iid=item, values=values['values'], tags=('not_matched',))
+
+    # 태그에 따른 배경색 설정
+    tree.tag_configure('matched', background='white')
+    tree.tag_configure('not_matched', background='lightgray')
 
     filter_window.destroy()
+
+
+
+def reset_treeview(tree):
+    for item in tree.get_children():
+        tree.item(item, tags=('default',))
+
+    tree.tag_configure('default', background='white')
 
 
 
