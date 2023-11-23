@@ -2,6 +2,7 @@ import tkinter as tk
 from tkinter import ttk, filedialog, messagebox, scrolledtext
 import csv
 import os
+import tkinter
 
 global canvas
 
@@ -254,7 +255,7 @@ def create_result_frame(parent, title, items):
 def show_filter_window(headers, tree):
     filter_window = tk.Toplevel(app)
     filter_window.title("필터 설정")
-    filter_window.geometry("400x500")
+    filter_window.geometry("330x400")
     filter_window.resizable(False, False)
 
     filter_frame = tk.Frame(filter_window)
@@ -268,7 +269,7 @@ def show_filter_window(headers, tree):
     add_condition_button.pack(side='top', pady=5)
 
     # 필터링 적용 버튼에 트리 뷰 전달
-    apply_button = tk.Button(button_frame, text="적용", command=lambda: apply_filters(tree, headers))
+    apply_button = tk.Button(button_frame, text="적용", command=lambda: apply_filters(tree, headers, filter_window))
     apply_button.pack(side='left', padx=5)
 
     # 필터링 조건 추가 함수를 처음에 한 번 호출하여 초기 조건을 설정합니다.
@@ -291,10 +292,6 @@ def add_filter_condition(filter_frame, headers, tree):
     filter_entry = ttk.Entry(condition_frame, width=20)
     filter_entry.pack(side='left', padx=5)
     
-    # AND, OR 선택을 위한 콤보박스
-    condition_combobox = ttk.Combobox(condition_frame, values=["AND", "OR"], state="readonly", width=5)
-    condition_combobox.pack(side='left', padx=5)
-    condition_combobox.current(0)
 
     # 삭제 버튼 추가
     def delete_condition():
@@ -307,33 +304,37 @@ def add_filter_condition(filter_frame, headers, tree):
     condition = {
         "header_combobox": header_combobox,
         "filter_entry": filter_entry,
-        "condition_combobox": condition_combobox
     }
     filter_conditions.append(condition)
 
 
 
-def apply_filters(tree, headers):
+def apply_filters(tree, headers, filter_window):
+    for item in tree.get_children():
+        tree.item(item, tags=('default',))
+
     for item in tree.get_children():
         item_values = tree.item(item, 'values')
-        match = True  # 모든 조건을 만족하는지 확인
+        match = True
 
         for condition in filter_conditions:
-            header = condition["header_combobox"].get()
-            value = condition["filter_entry"].get().lower()
-            operator = condition["condition_combobox"].get()
+            try:
+                header = condition["header_combobox"].get()
+                value = condition["filter_entry"].get().lower()
 
-            header_index = headers.index(header) if header != "전체" else None
+                header_index = headers.index(header) if header != "전체" else None
 
-            # 해당 조건을 만족하는지 확인
-            if header_index is not None:
-                if value not in item_values[header_index].lower():
-                    match = False
-                    break
-            else:
-                if not any(value in str(v).lower() for v in item_values):
-                    match = False
-                    break
+                if header_index is not None:
+                    if value not in item_values[header_index].lower():
+                        match = False
+                        break
+                else:
+                    if not any(value in str(v).lower() for v in item_values):
+                        match = False
+                        break
+            except tkinter.TclError:
+                # 위젯이 더 이상 유효하지 않음
+                continue
 
         if not match:
             tree.item(item, tags=('not_found',))
@@ -342,6 +343,10 @@ def apply_filters(tree, headers):
 
     tree.tag_configure('found', background='white')
     tree.tag_configure('not_found', background='lightgray')
+    tree.tag_configure('default', background='white')
+
+    filter_window.destroy()
+
 
 
 
