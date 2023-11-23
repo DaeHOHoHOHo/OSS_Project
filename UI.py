@@ -165,8 +165,6 @@ def navigate_search_results(tree, search_results, direction):
 
 
 
-
-
 # 결과 리스트 토글 기능
 def toggle_items(frame):
     frame.pack_forget() if frame.winfo_viewable() else frame.pack(side='top', fill='x', padx=5, pady=5)
@@ -251,10 +249,6 @@ def create_result_frame(parent, title, items):
 
 
 
-
-
-
-
 # 필터링 창 생성 및 설정
 def show_filter_window(headers, tree):
     filter_window = tk.Toplevel(app)
@@ -272,17 +266,15 @@ def show_filter_window(headers, tree):
     add_condition_button = tk.Button(filter_window, text="조건추가", command=lambda: add_filter_condition(filter_frame, headers, tree))
     add_condition_button.pack(side='top', pady=5)
 
-    # 필터링 적용 버튼에 트리 뷰 전달
+    # 필터링 적용 버튼
     apply_button = tk.Button(button_frame, text="적용", command=lambda: apply_filters(tree, headers, filter_window))
     apply_button.pack(side='left', padx=5)
 
-    # 필터링 조건 추가 함수를 처음에 한 번 호출하여 초기 조건을 설정합니다.
     add_filter_condition(filter_frame, headers, tree)
 
 
 filter_conditions = []
 def add_filter_condition(filter_frame, headers, tree):
-    # 새로운 필터링 조건을 위한 프레임 생성
     condition_frame = tk.Frame(filter_frame)
     condition_frame.pack(fill='x', padx=5, pady=5)
 
@@ -297,14 +289,14 @@ def add_filter_condition(filter_frame, headers, tree):
     filter_entry.pack(side='left', padx=5)
     
 
-    # 삭제 버튼 추가
+    # 삭제 버튼
     def delete_condition():
         condition_frame.destroy()
 
     delete_button = tk.Button(condition_frame, text="X", command=delete_condition)
     delete_button.pack(side='right', padx=5)
 
-    # 필터링 조건 저장을 위한 딕셔너리
+    # 필터링 조건 저장
     condition = {
         "header_combobox": header_combobox,
         "filter_entry": filter_entry,
@@ -347,15 +339,15 @@ def apply_filters(tree, headers, filter_window):
     # 트리 뷰에서 모든 항목 삭제
     tree.delete(*tree.get_children())
 
-    # 필터 조건에 맞는 항목들을 먼저 삽입하고 태그 지정
+    # 필터 조건에 맞는 항목
     for item, values in matching_items:
         tree.insert('', 'end', iid=item, values=values['values'], tags=('matched',))
 
-    # 필터 조건에 맞지 않는 항목들을 그 다음에 삽입하고 태그 지정
+    # 필터 조건에 맞지 않는 항목
     for item, values in non_matching_items:
         tree.insert('', 'end', iid=item, values=values['values'], tags=('not_matched',))
 
-    # 태그에 따른 배경색 설정
+    # 배경색 설정
     tree.tag_configure('matched', background='white')
     tree.tag_configure('not_matched', background='lightgray')
 
@@ -392,15 +384,12 @@ def move_to_frame():
     if selected_artifact in artifact_frames:
         y_position = artifact_frames[selected_artifact]
         
-        # 캔버스 스크롤 영역의 높이를 가져옴
         scrollregion = canvas.cget("scrollregion").split()
         if scrollregion:
             scrollregion_height = int(scrollregion[3])
 
-            # 프레임의 상대적 위치 계산
             relative_position = y_position / scrollregion_height
 
-            # 캔버스 스크롤
             canvas.yview_moveto(relative_position)
 
 
@@ -421,21 +410,19 @@ def start_capture():
 
     case_ref = case_ref_entry.get()
 
-    # 고정 콤보박스를 위한 새 프레임 생성
     fixed_frame = tk.Frame(app, background='#f0f0f0')
     fixed_frame.grid(row=0, column=0, columnspan=3, sticky='ew')
 
     move_button = ttk.Button(fixed_frame, text="이동", command=move_to_frame)
     move_button.grid(row=0, column=1, padx=5, pady=5)
 
-    # 선택된 체크박스 목록 생성
+    # 체크박스 목록
     selected_options = [option for option in options if variables[option].get()]
     
-    # 콤보박스 생성 및 설정
+    # 콤보박스
     selected_combobox = ttk.Combobox(fixed_frame, values=selected_options, state="readonly")
     selected_combobox.grid(row=0, column=0, padx=5, pady=5)
 
-    # 스크롤 가능한 프레임
     canvas = tk.Canvas(app, borderwidth=0, background="#ffffff", height=550, width=780)
     scrollbar = tk.Scrollbar(app, orient="vertical", command=canvas.yview)
     canvas.configure(yscrollcommand=scrollbar.set)
@@ -444,7 +431,6 @@ def start_capture():
     canvas.bind_all("<MouseWheel>", on_mousewheel)
 
 
-    # 캔버스 안에 결과 프레임 배치
     result_container = tk.Frame(canvas, background='white')
     canvas.create_window((0, 0), window=result_container, anchor="nw")
     result_container.bind("<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
@@ -463,10 +449,8 @@ def start_capture():
             frame = create_result_frame(result_container, option, result_items)
             frame.pack(side='top', fill='x', padx=5, pady=5)
 
-            # Tkinter 윈도우 갱신
             app.update_idletasks()
 
-            # 프레임의 실제 높이 계산
             frame_height = frame.winfo_height()
             artifact_frames[option] = y_position
             y_position += frame_height
