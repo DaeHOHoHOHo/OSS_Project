@@ -209,6 +209,10 @@ def create_result_frame(parent, title, items):
         down_button = tk.Button(search_frame, text="아래", command=lambda: navigate_search_results(tree, search_results, "down"))
         down_button.pack(side='left', padx=5, pady=5)
 
+        # 필터링 버튼 추가
+        filter_button = tk.Button(search_frame, text="필터링", command=lambda: show_filter_window(items[0], tree))
+        filter_button.pack(side='left', padx=5, pady=5)
+
         search_button.config(command=lambda: search_in_treeview(tree, search_entry.get(), header_combobox.get(), header_map, search_results))
 
 
@@ -239,6 +243,109 @@ def create_result_frame(parent, title, items):
     title_label.bind("<Button-1>", lambda e: toggle_items(items_frame))
 
     return frame
+
+
+
+
+
+
+
+# 필터링 창 생성 및 설정
+def show_filter_window(headers, tree):
+    filter_window = tk.Toplevel(app)
+    filter_window.title("필터 설정")
+    filter_window.geometry("400x500")
+    filter_window.resizable(False, False)
+
+    filter_frame = tk.Frame(filter_window)
+    filter_frame.pack(fill='both', expand=True, padx=5, pady=5)
+
+    button_frame = tk.Frame(filter_window)
+    button_frame.pack(side='top', pady=5)
+
+    # 조건추가 버튼
+    add_condition_button = tk.Button(filter_window, text="조건추가", command=lambda: add_filter_condition(filter_frame, headers, tree))
+    add_condition_button.pack(side='top', pady=5)
+
+    # 필터링 적용 버튼에 트리 뷰 전달
+    apply_button = tk.Button(button_frame, text="적용", command=lambda: apply_filters(tree, headers))
+    apply_button.pack(side='left', padx=5)
+
+    # 필터링 조건 추가 함수를 처음에 한 번 호출하여 초기 조건을 설정합니다.
+    add_filter_condition(filter_frame, headers, tree)
+
+
+filter_conditions = []
+def add_filter_condition(filter_frame, headers, tree):
+    # 새로운 필터링 조건을 위한 프레임 생성
+    condition_frame = tk.Frame(filter_frame)
+    condition_frame.pack(fill='x', padx=5, pady=5)
+
+    # 헤더 선택을 위한 콤보박스
+    header_options = ["전체"] + headers
+    header_combobox = ttk.Combobox(condition_frame, values=header_options, state="readonly", width=10)
+    header_combobox.pack(side='left', padx=5)
+    header_combobox.current(0)
+
+    # 필터링 내용을 입력할 입력 필드
+    filter_entry = ttk.Entry(condition_frame, width=20)
+    filter_entry.pack(side='left', padx=5)
+    
+    # AND, OR 선택을 위한 콤보박스
+    condition_combobox = ttk.Combobox(condition_frame, values=["AND", "OR"], state="readonly", width=5)
+    condition_combobox.pack(side='left', padx=5)
+    condition_combobox.current(0)
+
+    # 삭제 버튼 추가
+    def delete_condition():
+        condition_frame.destroy()
+
+    delete_button = tk.Button(condition_frame, text="X", command=delete_condition)
+    delete_button.pack(side='right', padx=5)
+
+    # 필터링 조건 저장을 위한 딕셔너리
+    condition = {
+        "header_combobox": header_combobox,
+        "filter_entry": filter_entry,
+        "condition_combobox": condition_combobox
+    }
+    filter_conditions.append(condition)
+
+
+
+def apply_filters(tree, headers):
+    for item in tree.get_children():
+        item_values = tree.item(item, 'values')
+        match = True  # 모든 조건을 만족하는지 확인
+
+        for condition in filter_conditions:
+            header = condition["header_combobox"].get()
+            value = condition["filter_entry"].get().lower()
+            operator = condition["condition_combobox"].get()
+
+            header_index = headers.index(header) if header != "전체" else None
+
+            # 해당 조건을 만족하는지 확인
+            if header_index is not None:
+                if value not in item_values[header_index].lower():
+                    match = False
+                    break
+            else:
+                if not any(value in str(v).lower() for v in item_values):
+                    match = False
+                    break
+
+        if not match:
+            tree.item(item, tags=('not_found',))
+        else:
+            tree.item(item, tags=('found',))
+
+    tree.tag_configure('found', background='white')
+    tree.tag_configure('not_found', background='lightgray')
+
+
+
+
 
 
 
@@ -302,7 +409,7 @@ def start_capture():
     selected_combobox.grid(row=0, column=0, padx=5, pady=5)
 
     # 스크롤 가능한 프레임
-    canvas = tk.Canvas(app, borderwidth=0, background="#ffffff", height=600, width=780)
+    canvas = tk.Canvas(app, borderwidth=0, background="#ffffff", height=550, width=780)
     scrollbar = tk.Scrollbar(app, orient="vertical", command=canvas.yview)
     canvas.configure(yscrollcommand=scrollbar.set)
     scrollbar.grid(row=3, column=1, sticky='ns')
@@ -452,4 +559,3 @@ result_label.grid(row=1002, column=0, columnspan=3, padx=5, pady=20)
 app.grid_rowconfigure(1, weight=1)
 app.grid_columnconfigure(1, weight=1)
 app.mainloop()
-
