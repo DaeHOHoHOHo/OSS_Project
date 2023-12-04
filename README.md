@@ -2,7 +2,7 @@
 포렌식 아티펙트 수집 시스템<br><br>
 
 다운로드 링크<br>
-https://drive.google.com/file/d/1sRrzUAxA2bVAPbwYKVx-bE-D7CJPSLEw/view?usp=sharing
+https://drive.google.com/file/d/1-yDbWH-itTcwRP-dFaEp2J01lMisU-oc/view
 <br>
 
 프로그램 실행 시 다음과 같은 아티펙트 정보 수집
