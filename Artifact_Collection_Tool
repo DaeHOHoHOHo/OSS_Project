@@ -2,20 +2,44 @@ import tkinter as tk
 from tkinter import ttk, filedialog, messagebox, scrolledtext
 import csv
 import os
-import tkinter
 import socket
 import psutil
 import win32evtlog
 import win32evtlogutil
 import win32gui
+import win32con
+import win32service
 import re
 from scapy.all import *
-import pythoncom
 import win32com.client
 import hashlib
 import psutil
 from datetime import datetime
 import time
+import winreg
+import pandas as pd
+from datetime import datetime
+import codecs
+import getpass
+import platform
+import subprocess
+import chardet
+import xml.etree.ElementTree as ET
+from Evtx import Evtx
+from Registry import Registry
+import subprocess
+from browser_history.browsers import Chrome
+from browser_history.browsers import Firefox
+from browser_history.browsers import Brave
+from browser_history.browsers import Chromium
+from browser_history.browsers import Edge
+from browser_history.browsers import LibreWolf
+from browser_history.browsers import Opera
+from browser_history.browsers import OperaGX
+from browser_history.browsers import Safari
+from browser_history.browsers import Vivaldi
+
+
 
 global canvas
 output_directory = ""
@@ -51,22 +75,188 @@ def memory_dump_func(output_directory):
     return 1
 
 def prefetch_func(output_directory):
-    return 1
+    case_number = case_ref_entry.get().replace('/', '_')
+    current_date = datetime.now().strftime('%Y-%m-%d')
+    filename = f'Prefetch_{case_number}_{current_date}.csv'
+
+    with open(os.path.join(output_directory, filename), 'w', newline='', encoding='utf-8-sig') as file:
+        csv_writer = csv.writer(file)
+
+        # Write the header line
+        header = ["Artifact timestamp", "Filename", "First executed", "Last executed", "Action", "Source"]
+        csv_writer.writerow(header)
+
+        prefetch_directory = r"C:\Windows\Prefetch\\"
+        prefetch_files = os.listdir(prefetch_directory)
+
+        for pf_file in prefetch_files:
+            if pf_file.endswith(".pf"):
+                full_path = os.path.join(prefetch_directory, pf_file)
+                app_name = pf_file[:-12]
+                first_executed = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(os.path.getctime(full_path)))
+                last_executed = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(os.path.getmtime(full_path)))
+
+                first_executed_line = [first_executed, app_name, first_executed, last_executed, "Program first executed", "Prefetch - " + pf_file]
+                last_executed_line = [last_executed, app_name, first_executed, last_executed, "Program last executed", "Prefetch - " + pf_file]
+
+                csv_writer.writerow(first_executed_line)
+                csv_writer.writerow(last_executed_line)
 
 def NTFS_func(output_directory):
-    return 1
+    image_path = "\\\\.\\C:"
+    script_path = "MFT_func.py"
+
+    case_number = case_ref_entry.get().replace('/', '_')
+    current_date = datetime.now().strftime('%Y-%m-%d')
+    filename = f'NTFS_{case_number}_{current_date}.csv'
+    output_file = os.path.join(output_directory, filename)
+
+    subprocess.run(["python", script_path, image_path, output_file], check=True)
 
 def sys_info_func(output_directory):
-    return 1
+    try:
+        case_number = case_ref_entry.get().replace('/', '_')
+        current_date = datetime.now().strftime('%Y-%m-%d')
+        filename = f'시스템 정보_{case_number}_{current_date}.csv'
+        with open(os.path.join(output_directory, filename), 'w', newline='', encoding='utf-8-sig') as file:
+            csv_writer = csv.writer(file)
+            headers = ['Type', 'Information']
+            csv_writer.writerow(headers)
+
+            system_info = {
+                'System': platform.system(),
+                'Node Name': platform.node(),
+                'Release': platform.release(),
+                'Version': platform.version(),
+                'Architecture': platform.architecture(),
+                'Machine': platform.machine(),
+                'Processor': platform.processor()
+            }
+            for key, value in system_info.items():
+                csv_writer.writerow([key, value])
+
+            gp_result = subprocess.run(['gpresult', '/r'], capture_output=True, text=True)
+            group_policy_info = gp_result.stdout if gp_result.returncode == 0 else f"Error: {gp_result.stderr}"
+            csv_writer.writerow(['Group Policy Info', group_policy_info])
+
+            audit_result = subprocess.run(['auditpol', '/get', '/category:*'], capture_output=True, text=True)
+            system_audit_info = audit_result.stdout if audit_result.returncode == 0 else f"Error: {audit_result.stderr}"
+            csv_writer.writerow(['System Audit Info', system_audit_info])
+
+    except Exception as e:
+        print(f"An error occurred while saving system information: {e}")
 
 def regi_hive(output_directory):
-    return 1
+    key_paths = [
+        'HKEY_CURRENT_USER',
+        r'HKLM\sam',
+        r'HKLM\security',
+        r'HKLM\software',
+        r'HKLM\system',
+        r'HKEY_USERS\.DEFAULT',
+        'HKEY_CURRENT_CONFIG',
+    ]
+    extract_files = []
+
+    def recursive_search(key, csv_writer):
+        subkeys = key.subkeys()
+        if len(subkeys) == 0:
+            for v in key.values():
+                try:
+                    csv_writer.writerow([key.path(), v.name(), v.value()])
+                except Registry.RegistryParse.UnknownTypeException:
+                    pass
+                except UnicodeDecodeError:
+                    pass
+        else:
+            for subkey in subkeys:
+                recursive_search(subkey, csv_writer)
+
+    def export_registry_key_to_csv(hive_path, output_csv):
+        reg = Registry.Registry(hive_path)
+        key = reg.root()
+        with open(output_csv, 'w', newline='', encoding='utf-8') as csv_file:
+            csv_writer = csv.writer(csv_file, dialect=csv.excel, quoting=csv.QUOTE_MINIMAL)
+            csv_writer.writerow(['Path', 'Name', 'Value'])
+            recursive_search(key, csv_writer)
+
+    def extract_registry_file():
+        try:
+            for key_path in key_paths:
+                safe_key_path = key_path.replace('\\', '_')
+                output_file = os.path.join(output_directory, f"{safe_key_path}.reg")
+                if subprocess.run(['reg', 'save', key_path, output_file], check=True).returncode == 0:
+                    extract_files.append(output_file)
+        except subprocess.CalledProcessError as e:
+            print(f"Error exporting registry hive: {e}")
+
+    extract_registry_file()
+    for file in extract_files:
+        case_number = case_ref_entry.get().replace('/', '_')
+        current_date = datetime.now().strftime('%Y-%m-%d')
+        filename = f'레지스트리 하이브_{case_number}_{current_date}.csv'
+        export_registry_key_to_csv(file, f"{output_directory}/{filename}")
 
 def event_viewer_log_func(output_directory):
-    return 1
+    def parse_tag(element):
+        if element.tag.index('}') > 0:
+            return element[element.tag.index('}')+1:]
+
+    def parse_log(log_file):
+        with Evtx.Evtx(log_file) as log:
+            title_row = [
+                'Provider name',
+                'Provider guid',
+                'EventID',
+                'Version',
+                'Level',
+                'Task',
+                'Opcode',
+                'Keywords',
+                'TimeCreadted',
+                'EventRecordID',
+                'ActivityID',
+                'RelatedActivityID',
+                'ProcessID',
+                'ThreadID',
+                'Channel',
+                'Computer',
+                'Security'
+            ]
+            case_number = case_ref_entry.get().replace('/', '_')
+            current_date = datetime.now().strftime('%Y-%m-%d')
+            filename = f'이벤트 뷰어 로그_{case_number}_{current_date}.csv'
+            output_csv_file = f"{output_directory}/{filename}.csv"
+            csv_file = csv.writer(open(output_csv_file, 'w', newline=''), dialect=csv.excel, quoting=csv.QUOTE_MINIMAL)
+            csv_file.writerow(title_row)
+
+            for record in log.records():
+                csv_record = []
+                root = ET.fromstring(record.xml())
+                for child in root[0]:
+                    if child.attrib.items():  # attribute가 있는 경우
+                        for key, value in child.attrib.items():
+                            if key == "Qualifiers":
+                                csv_record.append(child.text)
+                            else:
+                                csv_record.append(value)
+                    else:  # attribute가 없는 경우
+                        csv_record.append(child.text)
+                csv_file.writerow(csv_record)
 
 def enviornment_func(output_directory):
-    return 1
+    env_vars = os.environ
+    
+    case_number = case_ref_entry.get().replace('/', '_')
+    current_date = datetime.now().strftime('%Y-%m-%d')
+    filename = f'환경변수_{case_number}_{current_date}.csv'
+    with open(os.path.join(output_directory, filename), 'w', newline='', encoding='utf-8-sig') as file:
+        csv_writer = csv.writer(file, dialect=csv.excel, quoting=csv.QUOTE_ALL)
+        
+        csv_writer.writerow(['Key', 'Value'])
+        
+        for key, value in env_vars.items():
+            csv_writer.writerow([key, value])
 
 def patch_list_func(output_directory):
     update_session = win32com.client.Dispatch("Microsoft.Update.Session")
@@ -75,7 +265,10 @@ def patch_list_func(output_directory):
     history_count = update_searcher.GetTotalHistoryCount()
     updates = update_searcher.QueryHistory(0, history_count)
 
-    with open(os.path.join(output_directory, '패치 리스트.csv'), 'w', newline='', encoding='utf-8-sig') as file:
+    case_number = case_ref_entry.get().replace('/', '_')
+    current_date = datetime.now().strftime('%Y-%m-%d')
+    filename = f'패치 리스트_{case_number}_{current_date}.csv'
+    with open(os.path.join(output_directory, filename), 'w', newline='', encoding='utf-8-sig') as file:
         writer = csv.writer(file)
         writer.writerow(['Title', 'Update ID', 'Version', 'Date'])
 
@@ -96,7 +289,10 @@ def patch_list_func(output_directory):
             writer.writerow([title_only, kb_number, version, str(update.Date)])
 
 def process_list_info_func(output_directory):
-    with open(os.path.join(output_directory, '실행 프로세스 목록 정보.csv'), 'w', newline='', encoding='utf-8-sig') as file:
+    case_number = case_ref_entry.get().replace('/', '_')
+    current_date = datetime.now().strftime('%Y-%m-%d')
+    filename = f'실행 프로세스 목록 정보_{case_number}_{current_date}.csv'
+    with open(os.path.join(output_directory, filename), 'w', newline='', encoding='utf-8-sig') as file:
         writer = csv.writer(file)
         writer.writerow(['Process ID', 'Process name', 'Process path', 'Process creat time', 'Process access time', 'Process modify time', 'Process size', 'hash value(sha-256)'])
 
@@ -142,7 +338,10 @@ def process_list_info_func(output_directory):
 def connection_info_func(output_directory):
     host_name = socket.gethostname()
 
-    with open(os.path.join(output_directory, '연결 정보 (열려진 포트).csv'), 'w', newline='', encoding='utf-8-sig') as file:
+    case_number = case_ref_entry.get().replace('/', '_')
+    current_date = datetime.now().strftime('%Y-%m-%d')
+    filename = f'연결 정보 (열려진 포트)_{case_number}_{current_date}.csv'
+    with open(os.path.join(output_directory, filename), 'w', newline='', encoding='utf-8-sig') as file:
         writer = csv.writer(file)
         writer.writerow(['Port Number'])
 
@@ -156,7 +355,10 @@ def connection_info_func(output_directory):
                 writer.writerow([sent[TCP].dport])
 
 def ip_setting_info_func(output_directory):
-    with open(os.path.join(output_directory, 'IP 설정 정보.csv'), 'w', newline='', encoding='utf-8-sig') as file:
+    case_number = case_ref_entry.get().replace('/', '_')
+    current_date = datetime.now().strftime('%Y-%m-%d')
+    filename = f'IP 설정 정보_{case_number}_{current_date}.csv'
+    with open(os.path.join(output_directory, filename), 'w', newline='', encoding='utf-8-sig') as file:
         writer = csv.writer(file)
         writer.writerow(['Interface', 'IP Address', 'Netmask', 'Broadcast Address'])
         
@@ -177,7 +379,10 @@ def ip_setting_info_func(output_directory):
 def ARP_info_func(output_directory):
     arp_table = os.popen('arp -a').read()
 
-    with open(os.path.join(output_directory, 'ARP 정보.csv'), 'w', newline='', encoding='utf-8-sig') as file:
+    case_number = case_ref_entry.get().replace('/', '_')
+    current_date = datetime.now().strftime('%Y-%m-%d')
+    filename = f'ARP 정보_{case_number}_{current_date}.csv'
+    with open(os.path.join(output_directory, filename), 'w', newline='', encoding='utf-8-sig') as file:
         writer = csv.writer(file)
         writer.writerow(['IP Address', 'Physical Address', 'Type'])
 
@@ -190,7 +395,10 @@ def ARP_info_func(output_directory):
                     writer.writerow([parts[0], parts[1], type_value])
 
 def NetBIOS_info_func(output_directory):
-    with open(os.path.join(output_directory, 'NetBIOS 정보.csv'), 'w', newline='', encoding='utf-8-sig') as file:
+    case_number = case_ref_entry.get().replace('/', '_')
+    current_date = datetime.now().strftime('%Y-%m-%d')
+    filename = f'NetBIOS 정보_{case_number}_{current_date}.csv'
+    with open(os.path.join(output_directory, filename), 'w', newline='', encoding='utf-8-sig') as file:
         writer = csv.writer(file)
         writer.writerow(['Network Name', 'IP Address', 'NetBIOS name', 'NetBIOS type', 'NetBIOS status'])
 
@@ -227,7 +435,10 @@ def open_handle_info_func(output_directory):
     result = []
     win32gui.EnumWindows(callback, result)
 
-    with open(os.path.join(output_directory, '열려있는 핸들 정보.csv'), 'w', newline='', encoding='utf-8-sig') as file:
+    case_number = case_ref_entry.get().replace('/', '_')
+    current_date = datetime.now().strftime('%Y-%m-%d')
+    filename = f'열려있는 핸들 정보_{case_number}_{current_date}.csv'
+    with open(os.path.join(output_directory, filename), 'w', newline='', encoding='utf-8-sig') as file:
         writer = csv.writer(file)
         writer.writerow(['Window Number', 'Window Title', 'Window Class', 'Visible'])
 
@@ -240,7 +451,10 @@ def open_handle_info_func(output_directory):
             ])
 
 def work_schedule_info_func(output_directory):
-    with open(os.path.join(output_directory, '작업 스케쥴 정보.csv'), 'w', newline='', encoding='utf-8-sig') as file:
+    case_number = case_ref_entry.get().replace('/', '_')
+    current_date = datetime.now().strftime('%Y-%m-%d')
+    filename = f'작업 스케줄 정보_{case_number}_{current_date}.csv'
+    with open(os.path.join(output_directory, filename), 'w', newline='', encoding='utf-8-sig') as file:
         writer = csv.writer(file)
         writer.writerow(["Task name", "Last run Time", "Next run Time", "Enabled", "Trigger Count", "Action Count"])
 
@@ -265,7 +479,10 @@ def sys_logon_info_func(output_directory):
     log_type = ['Application', 'System', 'Security', 'Setup', 'Forwarded Events']
     query = 'logon'
 
-    with open(os.path.join(output_directory, '시스템 로그온 정보.csv'), 'w', newline='', encoding='utf-8-sig') as file:
+    case_number = case_ref_entry.get().replace('/', '_')
+    current_date = datetime.now().strftime('%Y-%m-%d')
+    filename = f'시스템 로그온 정보_{case_number}_{current_date}.csv'
+    with open(os.path.join(output_directory, filename), 'w', newline='', encoding='utf-8-sig') as file:
         writer = csv.writer(file)
         writer.writerow(['Log Type', 'Event ID', 'Source', 'Time Generated', 'Time Written', 'Event Category', 'Event Type'])
 
@@ -289,31 +506,265 @@ def sys_logon_info_func(output_directory):
                 events = win32evtlog.ReadEventLog(hand, flags, 0)
 
 def regi_service_info_func(output_directory):
-    return 1
+    resume = 0
+    accessSCM = win32con.GENERIC_READ
+    accessSrv = win32service.SC_MANAGER_ALL_ACCESS
+
+    hscm = win32service.OpenSCManager(None, None, accessSCM)
+
+    typeFilter = win32service.SERVICE_WIN32
+    stateFilter = win32service.SERVICE_STATE_ALL
+
+    statuses = win32service.EnumServicesStatus(hscm, typeFilter, stateFilter)
+
+    case_number = case_ref_entry.get().replace('/', '_')
+    current_date = datetime.now().strftime('%Y-%m-%d')
+    filename = f'등록된 서비스 정보_{case_number}_{current_date}.csv'
+    output_path = os.path.join(output_directory, filename)
+    with open(output_path, 'w', newline='', encoding='utf-8') as f:
+        csv_writer = csv.writer(f)
+        csv_writer.writerow(['Short Name', 'Description', 'Status'])
+
+        for (short_name, desc, status) in statuses:
+            csv_writer.writerow([short_name, desc, status])
 
 def recent_act_info_func(output_directory):
     return 1
 
 def userassist_func(output_directory):
-    return 1
+    def get_reg_value_userassist(key_path):
+        userassist_list = []
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, key_path) as key:
+            for i in range(0, winreg.QueryInfoKey(key)[0]):
+                userassist = winreg.EnumKey(key, i)
+                userassist_key_path = f"{key_path}\{userassist}\count"
+                
+                with winreg.OpenKey(winreg.HKEY_CURRENT_USER, userassist_key_path) as userassist_key:
+                    for j in range(0, winreg.QueryInfoKey(userassist_key)[1]):
+                        userassist_key_name = winreg.EnumValue(userassist_key, j)
+                        try:
+                            decrypted_userassist = codecs.decode(userassist_key_name[0], 'rot_13')
+                            userassist_list.append(decrypted_userassist)
+                        except:
+                            userassist_list.append(userassist_key_name[0])
+                            continue
+        return userassist_list
+
+    def csv_writer(files):
+        case_number = case_ref_entry.get().replace('/', '_')
+        current_date = datetime.now().strftime('%Y-%m-%d')
+        filename = f'UserAssist_{case_number}_{current_date}.csv'
+        csv_file_path = f"{output_directory}/{filename}.csv"
+        with open(csv_file_path, 'w', newline="") as f:
+            csv_writer = csv.writer(f)
+            csv_writer.writerow(['File Name'])
+            for file_name in files:
+                csv_writer.writerow([file_name])
+
+    userassist_list = get_reg_value_userassist(r"Software\Microsoft\Windows\CurrentVersion\Explorer\UserAssist")
+    csv_writer(userassist_list)
 
 def autorun_func(output_directory):
-    return 1
+    auto_run_list = [
+        'Software\Microsoft\Windows\CurrentVersion\Run', 
+        'Software\Microsoft\Windows\CurrentVersion\RunOnce'
+    ]
+
+    case_number = case_ref_entry.get().replace('/', '_')
+    current_date = datetime.now().strftime('%Y-%m-%d')
+    filename = f'AutoRun_{case_number}_{current_date}.csv'
+    with open(os.path.join(output_directory, filename), 'w', newline="") as f:
+        csv_writer = csv.writer(f)
+        csv_writer.writerow(['Process Name', 'Process Path', 'Status'])
+
+        for key_path in auto_run_list:
+            for hkey in (winreg.HKEY_LOCAL_MACHINE, winreg.HKEY_CURRENT_USER):
+                try:
+                    with winreg.OpenKey(hkey, key_path) as key:
+                        for j in range(winreg.QueryInfoKey(key)[1]):
+                            auto_run_info = winreg.EnumValue(key, j)
+                            csv_writer.writerow([auto_run_info[0], auto_run_info[1], auto_run_info[2]])
+                except Exception as e:
+                    print(f"[-] An error occurred: {e}")
 
 def registry_func(output_directory):
     return 1
 
 def browser_info_func(output_directory):
-    return 1
+    browsers = ['Chrome', 'Firefox', 'Brave', 'Chromium', 'Edge', 'LibreWolf', 'Opera', 'OperaGX', 'Safari', 'Vivaldi']
+
+    try:
+        case_number = case_ref_entry.get().replace('/', '_')
+        current_date = datetime.now().strftime('%Y-%m-%d')
+        filename = f'브라우저 기록_{case_number}_{current_date}.csv'
+        with open(os.path.join(output_directory, filename), 'w', newline='', encoding='utf-8') as f:
+            csv_writer = csv.writer(f)
+            csv_writer.writerow(['Time Stamp', 'Browser', 'URL Link', 'Explain'])
+
+            for browser in browsers:
+                try:
+                    if browser == 'Chrome':
+                        f = Chrome()
+                    elif browser == 'Firefox':
+                        f = Firefox()
+                    elif browser == 'Brave':
+                        f = Brave()
+                    elif browser == 'Chromium':
+                        f = Chromium()
+                    elif browser == 'Edge':
+                        f = Edge()
+                    elif browser == 'LibreWolf':
+                        f = LibreWolf()
+                    elif browser == 'Opera':
+                        f = Opera()
+                    elif browser == 'OperaGX':
+                        f = OperaGX()
+                    elif browser == 'Safari':
+                        f = Safari()
+                    elif browser == 'Vivaldi':
+                        f = Vivaldi()
+                    else:
+                        return
+
+                    outputs = f.fetch_history()
+                    his = outputs.histories
+
+                    for i in his:
+                        csv_writer.writerow([i[0], browser, i[1], i[2]])
+
+                except Exception as e:
+                    print(f"[-] Browser History({browser}) 파싱 중 에러 발생 : {e}")
+
+    except Exception as e:
+        print(f"[-] browser_history.csv 파일 관련 에러 발생 : {e}")
 
 def bin_func(output_directory):
-    return 1
+    def get_reg_value_sid(user_name, key_path):
+        with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, key_path) as key:
+            i = 0
+            while True:
+                try:
+                    sid = winreg.EnumKey(key, i)
+                    sid_key_path = f"{key_path}\{sid}"
+                    with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, sid_key_path) as sid_key:
+                        profile_path, _ = winreg.QueryValueEx(sid_key, "ProfileImagePath")
+                        if user_name.lower() in profile_path.lower():
+                            return sid
+                    i += 1
+                except:
+                    break
+
+    def analyze_deleted_file(file, file_path):
+        origin_file = f"$R{file[2:]}"
+        origin_file_path = f"{file_path}\\{origin_file}"
+        deleted_file_path = f"{file_path}\\{file}"
+
+        try:
+            with open(deleted_file_path, 'rb') as f:
+                raw_data = f.read()
+                result = chardet.detect(raw_data)
+                encoding = result['encoding'] if result['encoding'] is not None else 'utf-8'
+
+
+                content = raw_data.decode(encoding)
+                creation_time = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(os.path.getctime(deleted_file_path)))
+                modified_time = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(os.path.getmtime(deleted_file_path)))
+                access_time = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(os.path.getatime(deleted_file_path)))
+
+                file_size = str(os.path.getsize(origin_file_path))
+                return [deleted_file_path, creation_time, access_time, modified_time, file_size]
+        except UnicodeDecodeError as e:
+            print(f"[-] 인코딩 오류 발생 : {e}")
+            return None
+        except Exception as e:
+            print(f"다른 오류 발생 : {e}")
+            return None
+    user_name = getpass.getuser()
+    join_user_name = f"C:\\Users\\{user_name}"
+    recycle_path = 'C:\\$Recycle.Bin\\'
+    sid = get_reg_value_sid(join_user_name, r"SOFTWARE\Microsoft\Windows NT\CurrentVersion\ProfileList")
+    personal_recycle_path = f"{recycle_path}{sid}"
+
+    if os.path.exists(personal_recycle_path):
+        recycle_files = os.listdir(personal_recycle_path)
+        case_number = case_ref_entry.get().replace('/', '_')
+        current_date = datetime.now().strftime('%Y-%m-%d')
+        filename = f'휴지통_{case_number}_{current_date}.csv'
+        with open(os.path.join(output_directory, filename), 'w', newline="") as f:
+            csv_writer = csv.writer(f)
+            csv_writer.writerow(['Deleted FilePath', 'Creation Time', 'Access Time', 'Modified Time', 'File Size'])
+
+            for deleted_file in recycle_files:
+                if deleted_file == "desktop.ini":
+                    continue
+                else:
+                    file_info = analyze_deleted_file(deleted_file, personal_recycle_path)
+                    if file_info:
+                        csv_writer.writerow(file_info)
+    else:
+        print("[-] Recycle Bin 파싱 중 경로 문제 발생")
 
 def powershell_log_func(output_directory):
-    return 1
+    server=''
+    logtype='Windows PowerShell'
+    handle = win32evtlog.OpenEventLog(server, logtype)
+    flags = win32evtlog.EVENTLOG_BACKWARDS_READ | win32evtlog.EVENTLOG_SEQUENTIAL_READ
+    total = 0
+
+    try:
+        case_number = case_ref_entry.get().replace('/', '_')
+        current_date = datetime.now().strftime('%Y-%m-%d')
+        filename = f'파워쉘 로그_{case_number}_{current_date}.csv'
+        with open(os.path.join(output_directory, filename), 'w', newline='') as f:
+            csv_writer = csv.writer(f)
+            csv_writer.writerow(['Event Category', 'Generated Time', 'Source Name', 'Event ID', 'Event Type', 'Message'])
+
+            while True:
+                events = win32evtlog.ReadEventLog(handle, flags, 0)
+                if not events:
+                    break
+
+                for event in events:
+                    if event.EventCategory is None:
+                        continue
+                    else:
+                        csv_writer.writerow([event.EventCategory, event.TimeGenerated, event.SourceName, event.EventID, event.EventType, event.StringInserts])
+                        total += 1
+
+    finally:
+        win32evtlog.CloseEventLog(handle)
+
+    return total
 
 def lnk_files_func(output_directory):
-    return 1
+    user = getpass.getuser()
+    lnk_file_path = f"C:\\Users\\{user}\\AppData\\Roaming\\Microsoft\\Windows\\Recent"
+
+    if os.path.exists(lnk_file_path):
+        lnk_file_list = os.listdir(lnk_file_path)
+        filename, createtime_list, modifiedtime_list, accesstime_list = [], [], [], []
+
+        for file in lnk_file_list:
+            full_path = os.path.join(lnk_file_path, file)
+            createtime_list.append(datetime.fromtimestamp(os.path.getctime(full_path)))
+            modifiedtime_list.append(datetime.fromtimestamp(os.path.getmtime(full_path)))
+            accesstime_list.append(datetime.fromtimestamp(os.path.getatime(full_path)))
+            filename.append(file)
+
+        # 데이터프레임 생성 및 CSV 파일로 저장
+        df = pd.DataFrame({
+            'FileName': filename,
+            'CreatedTime': createtime_list,
+            'ModifiedTime': modifiedtime_list,
+            'Accesstime': accesstime_list
+        })
+        case_number = case_ref_entry.get().replace('/', '_')
+        current_date = datetime.now().strftime('%Y-%m-%d')
+        filename = f'LNK 파일_{case_number}_{current_date}.csv'
+        output_file = os.path.join(output_directory, filename)
+        df.to_csv(output_file)
+    else:
+        print("[-] Lnk 파일 경로가 올바르지 않음")
 
 
 # == 아티팩트 함수 ==========================================================================================================================
@@ -352,11 +803,11 @@ artifact_functions = {
 def open_status_window():
     global status_window
     status_window = tk.Toplevel(app)
-    status_window.title("진행 상태")
+    status_window.title("완료")
     status_window.geometry("300x100")
-    app.resizable(False, False)
-    status_label = tk.Label(status_window, text="작업 시작", font=("Arial", 12))
-    status_label.pack(pady=10)
+    status_window.resizable(False, False)
+    complete_label = tk.Label(status_window, text="모든 작업 완료.", font=("Arial", 12))
+    complete_label.pack(pady=10)
 
     def on_exit():
         app.quit()
@@ -391,27 +842,30 @@ def open_status_window():
 
         file_combobox.bind('<<ComboboxSelected>>', on_file_selected)
 
+        def go_back():
+           python_executable = sys.executable
+           script_file = sys.argv[0]
+           os.execl(python_executable, f'"{python_executable}"', f'"{script_file}"', *sys.argv[1:])
+
+        back_button = ttk.Button(app, text="뒤로 가기", command=go_back)
+        back_button.grid(row=1002, column=0, columnspan=3, padx=5, pady=20)
+
         if csv_files:
             selected_file_var.set(csv_files[0])
             on_file_selected(None)
 
 
     # 종료 버튼
-    exit_button = tk.Button(status_window, text="종료", command=on_exit, state='disabled')
+    exit_button = tk.Button(status_window, text="종료", command=on_exit)
     exit_button.pack(side="left", padx=10, pady=10)
 
     # 결과보기 버튼
-    result_button = tk.Button(status_window, text="결과보기", command=show_results, state='disabled')
+    result_button = tk.Button(status_window, text="결과보기", command=show_results)
     result_button.pack(side="right", padx=10, pady=10)
 
-    def update_status(message):
-        status_label.config(text=message)
-        status_window.update()
-        if message == "모든 작업 완료.":
-            exit_button.config(state='normal')
-            result_button.config(state='normal')
+    status_window.withdraw()
 
-    return update_status
+    return lambda message: status_label.config(text=message)
 
 
 
@@ -516,7 +970,7 @@ def create_scrollable_frame(parent):
     canvas = tk.Canvas(parent)
     canvas.grid(row=1, column=0, sticky='nsew')
     parent.grid_rowconfigure(1, weight=1)
-    parent.grid_columnconfigure(0, weight=1)
+    parent.grid_columnconfigure(1, weight=1)
 
     scrollable_frame = tk.Frame(canvas)
     canvas.create_window((0, 0), window=scrollable_frame, anchor='nw')
@@ -540,6 +994,7 @@ def execute_and_save_artifacts():
                 update_status(f"{artifact} 작업 완료")
 
     update_status("모든 작업 완료.")
+    status_window.deiconify()
 
 
 
@@ -571,7 +1026,6 @@ options_frame.grid(row=2, column=0, columnspan=3, padx=10, pady=5, sticky='ew')
 checkbuttons = {}
 variables = {}
 options = [
-    "메모리 덤프",
     "Prefetch", 
     "NTFS 아티팩트", 
     "시스템 정보",
@@ -589,10 +1043,8 @@ options = [
     "작업 스케줄 정보",
     "시스템 로그온 정보",
     "등록된 서비스 정보",
-    "최근 활동 정보",
     "UserAssist",
     "AutoRun",
-    "레지스트리",
     "브라우저 기록",
     "휴지통",
     "파워쉘 로그",
@@ -618,6 +1070,9 @@ browse_button.grid(row=1000, column=2, padx=5, pady=5)
 # 캡처 시작 버튼
 start_button = ttk.Button(app, text="캡처 시작", command=execute_and_save_artifacts)
 start_button.grid(row=1001, column=0, columnspan=3, padx=5, pady=20)
+
+status_label = tk.Label(app, text="", font=("Arial", 12), bg='#f0f0f0')
+status_label.grid(row=1002, column=0, columnspan=3, padx=5, pady=5)
 
 app.grid_columnconfigure(1, weight=1) 
 
