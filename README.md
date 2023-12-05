@@ -2,7 +2,7 @@
 포렌식 아티펙트 수집 시스템<br><br>
 
 다운로드 링크 (Download Link)<br>
-https://drive.google.com/file/d/1-yDbWH-itTcwRP-dFaEp2J01lMisU-oc/view
+https://drive.google.com/file/d/1NjqOMB9WTus6Om0WK08850V9QUdEE2yV/view?usp=sharing
 <br>
 <br>
 
