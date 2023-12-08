@@ -39,7 +39,7 @@ https://drive.google.com/file/d/1NjqOMB9WTus6Om0WK08850V9QUdEE2yV/view
 
 <br>
 
-## 프로그램 사용 방법 (How To Install)
+## 프로그램 사용 방법
 1. 위의 다운로드 링크에서 압축파일을 다운로드 받는다.
    ![image](https://github.com/DaeHOHoHOHo/OSS_Project/assets/112150244/6d290fb9-acef-4a68-99dd-2dff809a6663)
    <br><br>
